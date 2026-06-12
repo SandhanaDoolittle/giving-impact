@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Giving Impact</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <div class="logo">
+      <span class="logo-mark"></span>
+      <span class="logo-text">Giving Impact</span>
+    </div>
+    <nav class="header-nav">
+      <button class="nav-tab active" data-tab="donors">For Donors</button>
+      <button class="nav-tab" data-tab="foundations">Foundations</button>
+    </nav>
+  </div>
+</header>
+<div id="tab-donors" class="tab-content active">
+  <section class="hero">
+    <div class="container hero-inner">
+      <div class="hero-text">
+        <p class="hero-eyebrow">Donor Intelligence</p>
+        <h1>See what your gift<br><em>actually</em> accomplishes.</h1>
+        <p class="hero-sub">Real numbers from published 990 filings across vetted nonprofits in every cause area.</p>
+      </div>
+      <div class="calc-card">
+        <p class="calc-title">I want to give</p>
+        <div class="calc-input-wrap">
+          <span class="calc-dollar">$</span>
+          <input type="number" id="donation" value="100" min="1" />
+        </div>
+        <div id="hero-examples" class="hero-examples"></div>
+      </div>
+    </div>
+  </section>
+  <section class="cause-section" id="explore">
+    <div class="container">
+      <h2 class="section-title">Browse by cause</h2>
+      <div id="cause-grid" class="cause-grid"></div>
+    </div>
+  </section>
+  <section class="browse-section" id="browse">
+    <div class="container">
+      <div class="browse-toolbar">
+        <h2 class="section-title" style="margin-bottom:0">Organizations</h2>
+        <div class="toolbar-right">
+          <div class="search-wrap">
+            <svg viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="text" id="search" placeholder="Search organizations..." />
+          </div>
+          <label class="tog-wrap">
+            <input type="checkbox" id="hide-unavailable" />
+            <span class="tog"></span>
+            <span class="tog-txt">Hide no-data</span>
+          </label>
+          <label class="tog-wrap">
+            <input type="checkbox" id="hide-estimates" />
+            <span class="tog"></span>
+            <span class="tog-txt">Verified only</span>
+          </label>
+          <button id="layout-btn" class="layout-btn" title="Switch to 2-column grid">⊞</button>
+        </div>
+      </div>
+      <div class="filter-bar" id="filters">
+        <button class="filter active" data-cause="all">All</button>
+        <button class="filter" data-cause="food_security">🌾 Food Security</button>
+        <button class="filter" data-cause="workforce_dev">💼 Jobs &amp; Training</button>
+        <button class="filter" data-cause="housing">🏠 Housing</button>
+        <button class="filter" data-cause="missions">✝️ Missions</button>
+        <button class="filter" data-cause="recovery">🌱 Recovery</button>
+        <button class="filter" data-cause="international_aid">🌍 International</button>
+        <button class="filter" data-cause="health">❤️ Health</button>
+        <button class="filter" data-cause="education">📚 Education</button>
+        <button class="filter" data-cause="disaster_relief">⚡ Disaster Relief</button>
+        <button class="filter" data-cause="community">🤝 Community</button>
+        <button class="filter" data-cause="environment">🌿 Environment</button>
+        <button class="filter" data-cause="animal_welfare">🐾 Animals</button>
+      </div>
+      <div id="org-list"></div>
+    </div>
+  </section>
+</div>
+<div id="tab-foundations" class="tab-content">
+  <section class="hero">
+    <div class="container hero-inner" style="grid-template-columns:1fr">
+      <div class="hero-text" style="padding-bottom:52px">
+        <p class="hero-eyebrow">Foundation Accountability</p>
+        <h1>Are foundations giving<br><em>what they owe?</em></h1>
+        <p class="hero-sub">Private foundations receive billions in tax benefits. The law requires them to distribute at least 5% of assets annually. Here is how the largest ones measure up.</p>
+      </div>
+    </div>
+  </section>
+  <section class="browse-section">
+    <div class="container">
+      <div class="browse-toolbar">
+        <h2 class="section-title" style="margin-bottom:0">Foundation Compliance</h2>
+        <div class="toolbar-right">
+          <div class="search-wrap">
+            <svg viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="text" id="foundation-search" placeholder="Search foundations..." />
+          </div>
+          <div class="compliance-filters">
+            <button class="filter active" data-compliance="all">All</button>
+            <button class="filter" data-compliance="compliant">✅ Meeting 5%</button>
+            <button class="filter" data-compliance="noncompliant">❌ Below 5%</button>
+          </div>
+        </div>
+      </div>
+      <div id="foundation-summary" class="foundation-summary"></div>
+      <div id="foundation-visual" class="foundation-visual"></div>
+      <div id="foundation-list"></div>
+    </div>
+  </section>
+</div>
+<button id="back-to-top" aria-label="Back to top">↑</button>
+<script src="giving.js"></script>
+<script src="foundations.js"></script>
+</body>
+</html>
