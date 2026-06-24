@@ -445,4 +445,46 @@ body {
   #org-list.list-view .card-right { text-align: left; width: 100%; padding-top: 12px; border-top: 1px solid var(--linen-border); }
   #org-list.list-view .impact-lbl { text-align: left; }
   #org-list.list-view .impact-meta { justify-content: flex-start; }
+  .grant-row { flex-direction: column; }
+  .grant-row-right { text-align: left; }
+}
+
+/* ── Grant panels ── */
+.grant-panel {
+  border-top: 1px solid var(--linen-border);
+  padding: 14px 22px 16px;
+  background: var(--linen-mid);
+}
+.grant-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
+}
+.grant-panel-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--ink-muted);
+}
+.grant-match-pct {
+  font-size: 11px; color: var(--ink-ghost);
+}
+.grant-list { display: flex; flex-direction: column; gap: 8px; }
+.grant-row {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; padding: 8px 10px;
+  background: #ffffff; border-radius: 6px;
+  border: 1px solid var(--linen-border);
+}
+.grant-row-left { flex: 1; min-width: 0; }
+.grant-row-right { flex-shrink: 0; text-align: right; }
+.grant-recipient {
+  font-family: var(--font-display); font-size: 13px;
+  color: var(--ink); line-height: 1.3; margin-bottom: 2px;
+}
+.grant-metric { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
+.grant-amount {
+  font-family: var(--font-display); font-size: 15px;
+  color: var(--forest); font-weight: 600; line-height: 1;
+}
+.grant-more {
+  font-size: 11px; color: var(--ink-ghost);
+  text-align: center; padding-top: 4px; font-style: italic;
 }
