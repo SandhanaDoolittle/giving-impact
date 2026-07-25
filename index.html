@@ -19,6 +19,7 @@
     <nav class="header-nav">
       <button class="nav-tab active" data-tab="donors">For Donors</button>
       <button class="nav-tab" data-tab="foundations">Foundations</button>
+      <button class="nav-tab" data-tab="rankings">Rankings</button>
     </nav>
   </div>
 </header>
@@ -36,7 +37,6 @@
           <span class="calc-dollar">$</span>
           <input type="number" id="donation" value="100" min="1" />
         </div>
-        <div id="hero-examples" class="hero-examples"></div>
       </div>
     </div>
   </section>
@@ -82,6 +82,7 @@
         <button class="filter" data-cause="community">🤝 Community</button>
         <button class="filter" data-cause="environment">🌿 Environment</button>
         <button class="filter" data-cause="animal_welfare">🐾 Animals</button>
+        <button class="filter" data-cause="arts_culture">🎨 Arts &amp; Culture</button>
       </div>
       <div id="org-list"></div>
     </div>
@@ -92,7 +93,7 @@
     <div class="container hero-inner" style="grid-template-columns:1fr">
       <div class="hero-text" style="padding-bottom:52px">
         <p class="hero-eyebrow">Foundation Accountability</p>
-        <h1>Are foundations giving<br><em>what they owe?</em></h1>
+        <h1>Are foundations meeting<br><em>the legal requirement?</em></h1>
         <p class="hero-sub">Private foundations receive billions in tax benefits. The law requires them to distribute at least 5% of assets annually. Here is how the largest ones measure up.</p>
       </div>
     </div>
@@ -108,19 +109,45 @@
           </div>
           <div class="compliance-filters">
             <button class="filter active" data-compliance="all">All</button>
-            <button class="filter" data-compliance="compliant">✅ Meeting 5%</button>
-            <button class="filter" data-compliance="noncompliant">❌ Below 5%</button>
+            <button class="filter" data-compliance="compliant">✅ Compliant</button>
+            <button class="filter" data-compliance="noncompliant">❌ Non-compliant</button>
           </div>
         </div>
       </div>
-      <div id="foundation-summary" class="foundation-summary"></div>
       <div id="foundation-visual" class="foundation-visual"></div>
       <div id="foundation-list"></div>
     </div>
   </section>
 </div>
+<div id="tab-rankings" class="tab-content">
+  <section class="hero">
+    <div class="container hero-inner" style="grid-template-columns:1fr">
+      <div class="hero-text" style="padding-bottom:52px">
+        <p class="hero-eyebrow">Foundation Rankings</p>
+        <h1>Who's giving the most<br><em>relative to the legal minimum?</em></h1>
+        <p class="hero-sub">The most generous foundations relative to their legal minimum, and the foundations furthest behind in dollar terms.</p>
+      </div>
+    </div>
+  </section>
+  <section class="browse-section">
+    <div class="container">
+      <div id="foundation-summary" class="foundation-summary"></div>
+      <div id="foundation-priority" class="foundation-priority"></div>
+      <div id="foundation-effectiveness" class="foundation-priority"></div>
+    </div>
+  </section>
+</div>
+<div id="grant-drawer" class="grant-drawer">
+  <div class="grant-drawer-header">
+    <div class="grant-drawer-title" id="grant-drawer-title"></div>
+    <button class="grant-drawer-close" id="grant-drawer-close" aria-label="Close">&#x2715;</button>
+  </div>
+  <div class="grant-drawer-meta" id="grant-drawer-meta"></div>
+  <div class="grant-drawer-body" id="grant-drawer-body"></div>
+</div>
+<div id="grant-drawer-overlay" class="grant-drawer-overlay"></div>
 <button id="back-to-top" aria-label="Back to top">↑</button>
 <script src="giving.js"></script>
-<script src="foundations.js"></script>
+<script src="foundations.js?v=11"></script>
 </body>
 </html>

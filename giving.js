@@ -8,7 +8,6 @@ fetch('metrics.json')
     const hideBox    = document.getElementById('hide-unavailable');
     const hideEstBox = document.getElementById('hide-estimates');
     const causeGrid  = document.getElementById('cause-grid');
-    const heroEx     = document.getElementById('hero-examples');
 
     let currentCause    = 'all';
     let currentSearch   = '';
@@ -21,17 +20,20 @@ fetch('metrics.json')
       missions:'tag-missions', recovery:'tag-recovery', international_aid:'tag-international',
       health:'tag-health', education:'tag-education', disaster_relief:'tag-disaster',
       community:'tag-community', environment:'tag-environment', animal_welfare:'tag-animals',
+      arts_culture:'tag-arts',
     };
     const tagLabel = {
       food_security:'Food', workforce_dev:'Jobs', housing:'Housing',
       missions:'Missions', recovery:'Recovery', international_aid:'International',
       health:'Health', education:'Education', disaster_relief:'Disaster Relief',
       community:'Community', environment:'Environment', animal_welfare:'Animals',
+      arts_culture:'Arts & Culture',
     };
     const tileIcon = {
       food_security:'🌾', workforce_dev:'💼', housing:'🏠', missions:'✝️',
       recovery:'🌱', international_aid:'🌍', health:'❤️', education:'📚',
       disaster_relief:'⚡', community:'🤝', environment:'🌿', animal_welfare:'🐾',
+      arts_culture:'🎨',
     };
 
     // ── Helpers ──────────────────────────────────────────
@@ -69,51 +71,15 @@ fetch('metrics.json')
       return `provides approximately <strong>${Math.round(n).toLocaleString()} ${org.primary_metric_unit}</strong>`;
     }
 
-    function impactPlain(org, donation) {
-      if (org.impact_per_100_usd < 1 && org.cost_per_outcome_usd) {
-        const pct = (donation / org.cost_per_outcome_usd) * 100;
-        if (pct >= 100) {
-          const n = Math.floor(pct / 100);
-          return `${n} ${n===1?'person':'people'} — ${org.impact_description||'helped'}`;
-        }
-        return `${fmtNum(pct, 1)}% toward ${org.impact_description||'one outcome'}`;
-      }
-      const n = (donation / 100) * org.impact_per_100_usd;
-      return `${Math.round(n).toLocaleString()} ${org.primary_metric_unit}`;
-    }
-
-    // ── Hero examples ────────────────────────────────────
-    const heroCauses = ['food_security','international_aid','health','education','workforce_dev','housing'];
-
-    function updateHeroExamples(donation) {
-      const examples = heroCauses
-        .map(c => orgs
-          .filter(o => !o.pass_through && o.cause===c && o.data_available!==false && o.impact_per_100_usd && o.impact_per_100_usd >= 1)
-          .sort((a,b) => b.impact_per_100_usd - a.impact_per_100_usd)[0])
-        .filter(Boolean)
-        .slice(0, 3);
-
-      heroEx.innerHTML = examples.map(org => `
-        <div class="ex-chip">
-          <span class="ex-chip-icon">${tileIcon[org.cause]||'•'}</span>
-          <div class="ex-chip-text">
-            <strong>${impactPlain(org, donation)}</strong>
-            <span>${org.name}</span>
-          </div>
-        </div>
-      `).join('');
-    }
-
     // ── Cause tiles ──────────────────────────────────────
     function buildCauseTiles() {
       causeGrid.innerHTML = Object.keys(tagLabel).map(cause => {
         const n = orgs.filter(o => !o.pass_through && o.cause === cause).length;
         return `
           <button class="cause-tile${cause===currentCause?' active':''}" data-cause="${cause}">
-            <span class="tile-icon">${tileIcon[cause]}</span>
+            <span class="tile-circle"><span class="tile-icon">${tileIcon[cause]}</span></span>
             <span class="tile-name">${tagLabel[cause]}</span>
             <span class="tile-count">${n} org${n!==1?'s':''}</span>
-            <span class="tile-best" data-cause="${cause}"></span>
           </button>`;
       }).join('');
 
@@ -127,28 +93,11 @@ fetch('metrics.json')
       });
     }
 
-    function updateTileBests(donation) {
-      Object.keys(tagLabel).forEach(cause => {
-        const el = causeGrid.querySelector(`.tile-best[data-cause="${cause}"]`);
-        if (!el) return;
-        const best = orgs
-          .filter(o => !o.pass_through && o.cause===cause && o.data_available!==false && o.impact_per_100_usd && o.impact_per_100_usd >= 1)
-          .sort((a,b) => b.impact_per_100_usd - a.impact_per_100_usd)[0];
-        if (best) {
-          const n = (donation / 100) * best.impact_per_100_usd;
-          el.textContent = `Up to ${Math.round(n).toLocaleString()} ${best.primary_metric_unit}`;
-        } else {
-          const total = orgs.filter(o => !o.pass_through && o.cause===cause).length;
-          el.textContent = `${total} organizations`;
-        }
-      });
-    }
-
     function setActiveCause(cause) {
       currentCause = cause;
       causeGrid.querySelectorAll('.cause-tile').forEach(t =>
         t.classList.toggle('active', t.dataset.cause === cause));
-      document.querySelectorAll('.filter').forEach(b =>
+      document.querySelectorAll('.filter[data-cause]').forEach(b =>
         b.classList.toggle('active', b.dataset.cause === cause));
     }
 
@@ -214,17 +163,16 @@ fetch('metrics.json')
 
     // ── Init ─────────────────────────────────────────────
     buildCauseTiles();
-    updateTileBests(100);
-    updateHeroExamples(100);
     display(100);
 
     // Donation
     input.addEventListener('input', () => {
       const v = Number(input.value);
       if (!v || v < 1) return;
-      updateHeroExamples(v);
-      updateTileBests(v);
       display(v);
+    });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') input.blur();
     });
 
     // Search
@@ -246,7 +194,7 @@ fetch('metrics.json')
     });
 
     // Filter pills
-    document.querySelectorAll('.filter').forEach(btn => {
+    document.querySelectorAll('.filter[data-cause]').forEach(btn => {
       btn.addEventListener('click', () => {
         const next = btn.dataset.cause === currentCause ? 'all' : btn.dataset.cause;
         setActiveCause(next);

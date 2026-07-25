@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+*.bak-*
+auto_estimate_cache.json
+.claude/
