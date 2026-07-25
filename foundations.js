@@ -96,8 +96,8 @@ function renderSummary() {
     '</div>' +
     '<div class="fv-stats">' +
       '<div class="fv-stat"><div class="fv-stat-value">' + total.toLocaleString() + '</div><div class="fv-stat-label">grantmaking foundations tracked</div></div>' +
-      '<div class="fv-stat"><div class="fv-stat-value" style="color:#c0392b">' + nc.toLocaleString() + '</div><div class="fv-stat-label">below legal 5% minimum</div></div>' +
-      '<div class="fv-stat"><div class="fv-stat-value" style="color:#c0392b">' + fmtA(shortfall) + '</div><div class="fv-stat-label">undistributed vs legal minimum</div></div>' +
+      '<div class="fv-stat"><div class="fv-stat-value" style="color:#c07840">' + nc.toLocaleString() + '</div><div class="fv-stat-label">below legal 5% minimum</div></div>' +
+      '<div class="fv-stat"><div class="fv-stat-value" style="color:#c07840">' + fmtA(shortfall) + '</div><div class="fv-stat-label">undistributed vs legal minimum</div></div>' +
       '<div class="fv-stat"><div class="fv-stat-value">' + fmtA(totalAssets) + '</div><div class="fv-stat-label">total assets tracked</div></div>' +
       '<div class="fv-stat"><div class="fv-stat-value">' + withMatched.toLocaleString() + '</div><div class="fv-stat-label">foundations with grants matched to impact data</div></div>' +
     '</div>' +
@@ -395,7 +395,7 @@ function renderFoundations() {
           })() : '') +
           grantTag +
           (f.year_gap ? ' &middot; <span class="year-tag" title="We\'re missing data for one or more years in this foundation\'s 5-year window, so the numbers here cover a wider time range than usual.">⚠ Incomplete data window</span>' : '') +
-          (!good ? ' &middot; <strong style="color:#c0392b">' + sf + ' below the legal minimum</strong>' : '') +
+          (!good ? ' &middot; <strong style="color:#c07840">' + sf + ' below the legal minimum</strong>' : '') +
           '</div>' +
         '</div>' +
         '<div class="foundation-stats">' +
