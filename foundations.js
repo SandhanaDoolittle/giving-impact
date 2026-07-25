@@ -105,7 +105,7 @@ function renderSummary() {
       '<div class="fv-legend-note">Compliance excludes operating foundations (museums, research institutes, etc.) which are judged by an income test, not the 5% asset rule. Reflects a 5-year rolling average of qualifying distributions vs. the IRC §4942 minimum. Grant transparency = disclosed at least one named recipient in their public 990-PF. Impact matched = at least one recipient in our outcome database. Source: IRS 990-PF via ProPublica.</div>' +
     '</div>';
   setTimeout(function() {
-    var opts = { colorGood: '#e8dfc8', colorBad: '#2c5540' };
+    var opts = { colorGood: '#4a8a62', colorBad: '#c8bfb4' };
     drawDonut('donut-canvas', compliant, total, Object.assign({}, opts, { label: 'COMPLIANT' }));
     drawDonut('donut-canvas-2', withAnyGrant, total, Object.assign({}, opts, { label: 'TRANSPARENT' }));
     drawDonut('donut-canvas-3', withMatched, total, Object.assign({}, opts, { label: 'MATCHED' }));
