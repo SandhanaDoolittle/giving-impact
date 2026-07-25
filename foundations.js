@@ -96,8 +96,8 @@ function renderSummary() {
     '</div>' +
     '<div class="fv-stats">' +
       '<div class="fv-stat"><div class="fv-stat-value">' + total.toLocaleString() + '</div><div class="fv-stat-label">grantmaking foundations tracked</div></div>' +
-      '<div class="fv-stat"><div class="fv-stat-value" style="color:#c07840">' + nc.toLocaleString() + '</div><div class="fv-stat-label">below legal 5% minimum</div></div>' +
-      '<div class="fv-stat"><div class="fv-stat-value" style="color:#c07840">' + fmtA(shortfall) + '</div><div class="fv-stat-label">undistributed vs legal minimum</div></div>' +
+      '<div class="fv-stat"><div class="fv-stat-value">' + nc.toLocaleString() + '</div><div class="fv-stat-label">below legal 5% minimum</div></div>' +
+      '<div class="fv-stat"><div class="fv-stat-value">' + fmtA(shortfall) + '</div><div class="fv-stat-label">undistributed vs legal minimum</div></div>' +
       '<div class="fv-stat"><div class="fv-stat-value">' + fmtA(totalAssets) + '</div><div class="fv-stat-label">total assets tracked</div></div>' +
       '<div class="fv-stat"><div class="fv-stat-value">' + withMatched.toLocaleString() + '</div><div class="fv-stat-label">foundations with grants matched to impact data</div></div>' +
     '</div>' +
