@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""
+generate_impact_report.py — "What you actually funded vs. what you could have
+funded" report for a single foundation's grants.
+
+This is the core of the idea from Cam's notes: take a giver's list of last
+year's grants and come back with a report comparing what those dollars
+actually delivered against what they could have delivered if given to the
+most efficient organization in the same cause category.
+
+Data sources (all already in this repo, no new scraping needed):
+  - foundation_grants_{0..7}.json  -> each foundation's matched_detail list
+    (recipient, amount, confidence -- already matched to metrics.json)
+  - metrics.json                  -> cost_per_outcome_usd, cause, confidence,
+                                     primary_metric_unit, impact_description
+
+METHODOLOGY
+  For each grant in a foundation's matched_detail:
+    1. Look up the recipient's full metrics entry (for cause + cost_per_outcome_usd)
+    2. actual_units = amount / recipient's cost_per_outcome_usd
+    3. "Median in cause" = the MEDIAN cost_per_outcome_usd among orgs in the
+       SAME cause category with confidence in {high, medium} -- i.e. real
+       reported numbers, not sector-average auto-estimates, and not a
+       single outlier. Median (not lowest) is used deliberately: a single
+       hyper-scalable outlier (e.g. a free digital-content org with
+       near-zero marginal cost per person) would otherwise dominate every
+       comparison in its cause, reflecting a delivery-model mismatch
+       (in-person service vs. free digital content) rather than a real
+       efficiency signal. Median represents the typical well-documented org
+       in that cause -- a fairer bar, though still not delivery-model-aware.
+    4. potential_units = amount / median_in_cause's cost_per_outcome_usd
+    5. efficiency_pct = actual_units / potential_units * 100
+       (100% = as efficient as the cause's median well-documented org;
+       below 100% = less efficient than that median; above = more)
+
+  Grants that don't match a metrics entry, or match one with no
+  cost_per_outcome_usd, are reported separately as "not comparable" rather
+  than silently dropped or guessed at.
+
+  This deliberately does NOT try to rank organizations by "how good they
+  are" in general -- only by dollar-cost-per-reported-outcome within a
+  cause, which is a narrow and somewhat crude efficiency lens. The report
+  says so explicitly so it isn't over-read as a verdict on org quality.
+
+Run:
+  python3 generate_impact_report.py --ein 010387404
+  python3 generate_impact_report.py --name "Sewall"
+  python3 generate_impact_report.py --ein 010387404 --json report.json
+"""
+
+import json, glob, argparse
+from match_grants import normalize
+
+METRICS_FILE = "metrics.json"
+CHUNK_FILES = [f"foundation_grants_{i}.json" for i in range(8)]
+MIN_CONFIDENCE_FOR_BENCHMARK = {"high", "medium"}
+
+def load_metrics():
+    with open(METRICS_FILE) as f:
+        return json.load(f)
+
+def build_lookup(metrics):
+    by_norm = {}
+    for e in metrics:
+        names = e.get("pp_name") or []
+        if isinstance(names, str):
+            names = [names]
+        for raw in {e.get("name"), *names} - {None}:
+            by_norm.setdefault(normalize(raw), e)
+    return by_norm
+
+def build_cause_benchmarks(metrics):
+    """Median cost_per_outcome_usd per cause, among orgs with real (non-auto)
+    confidence and not pass-through re-granters.
+
+    Median instead of best/lowest: a single hyper-scalable outlier (e.g. a
+    free digital-content org with near-zero marginal cost per person) would
+    otherwise dominate every comparison in its cause, which is a
+    delivery-model mismatch, not a real efficiency signal. Median is the
+    typical well-documented org in that cause -- a fairer bar, though still
+    not delivery-model-aware. See generate_impact_report.py docstring.
+    """
+    from statistics import median
+    by_cause = {}  # cause -> list of (cost, name, label)
+    for e in metrics:
+        if e.get("pass_through"):
+            continue
+        if e.get("confidence") not in MIN_CONFIDENCE_FOR_BENCHMARK:
+            continue
+        cost = e.get("cost_per_outcome_usd")
+        cause = e.get("cause")
+        if not cost or not cause:
+            continue
+        by_cause.setdefault(cause, []).append((cost, e.get("name"), e.get("primary_metric_label") or e.get("primary_metric_unit")))
+
+    benchmarks = {}
+    for cause, entries in by_cause.items():
+        entries.sort(key=lambda t: t[0])
+        med_cost = median(c for c, _, _ in entries)
+        # representative org: closest entry to the median cost
+        closest = min(entries, key=lambda t: abs(t[0] - med_cost))
+        benchmarks[cause] = (med_cost, closest[1], closest[2])
+    return benchmarks
+
+def find_foundation(ein=None, name=None):
+    for path in CHUNK_FILES:
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            continue
+        for e in data:
+            if ein and str(e.get("ein")) == str(ein):
+                return e
+            if name and name.lower() in (e.get("name") or "").lower():
+                return e
+    return None
+
+def build_report(foundation, by_norm, benchmarks):
+    rows = []
+    not_comparable = []
+    for g in foundation.get("matched_detail", []):
+        recipient = g.get("recipient")
+        amount = g.get("amount") or 0
+        entry = by_norm.get(normalize(recipient))
+        cost = entry.get("cost_per_outcome_usd") if entry else None
+        cause = entry.get("cause") if entry else None
+
+        if not entry or not cost or not cause or cause not in benchmarks:
+            not_comparable.append({"recipient": recipient, "amount": amount,
+                                    "reason": "no cost-per-outcome data available"})
+            continue
+
+        median_cost, median_org, median_unit = benchmarks[cause]
+        actual_units = amount / cost
+        potential_units = amount / median_cost
+        efficiency_pct = round(actual_units / potential_units * 100, 1) if potential_units else None
+
+        rows.append({
+            "recipient": recipient,
+            "cause": cause,
+            "amount": amount,
+            "confidence": entry.get("confidence"),
+            "outcome_unit": entry.get("primary_metric_label") or entry.get("primary_metric_unit"),
+            "actual_units": round(actual_units, 1),
+            "median_in_cause_org": median_org,
+            "median_in_cause_units_for_same_dollars": round(potential_units, 1),
+            "efficiency_pct_vs_median_in_cause": efficiency_pct,
+        })
+
+    rows.sort(key=lambda r: r["amount"], reverse=True)
+    matched_dollars = sum(r["amount"] for r in rows)
+    return {
+        "foundation": foundation.get("name"),
+        "ein": foundation.get("ein"),
+        "year": foundation.get("year"),
+        "total_grants": foundation.get("total_grants"),
+        "total_amount": foundation.get("total_amount"),
+        "comparable_grants": len(rows),
+        "comparable_dollars": round(matched_dollars, 2),
+        "not_comparable_grants": len(not_comparable),
+        "grants": rows,
+        "not_comparable": not_comparable,
+        "methodology_note": (
+            "Efficiency is compared only within the same cause category "
+            "(e.g. food security vs. food security), against the best "
+            "reported cost-per-outcome among organizations with real "
+            "(non-estimated) data. This is a narrow cost lens, not a "
+            "verdict on organizational quality."
+        ),
+    }
+
+def print_report(report):
+    print(f"\n{'='*70}")
+    print(f"{report['foundation']}  (EIN {report['ein']}, {report['year']})")
+    print(f"{'='*70}")
+    print(f"Total grants: {report['total_grants']}  |  Total amount: ${report['total_amount']:,.0f}")
+    print(f"Comparable: {report['comparable_grants']} grants / ${report['comparable_dollars']:,.0f}")
+    print(f"Not comparable (no cost-per-outcome data): {report['not_comparable_grants']}")
+    print()
+    for r in report["grants"]:
+        flag = "⬆" if r["efficiency_pct_vs_median_in_cause"] and r["efficiency_pct_vs_median_in_cause"] >= 100 else "⬇"
+        print(f"  {r['recipient'][:40]:<40} ${r['amount']:>10,.0f}  [{r['cause']}]")
+        print(f"      delivered:  ~{r['actual_units']:,.1f} {r['outcome_unit']}")
+        print(f"      median in cause ({r['median_in_cause_org']}): ~{r['median_in_cause_units_for_same_dollars']:,.1f} for same $  "
+              f"{flag} {r['efficiency_pct_vs_median_in_cause']}% as efficient")
+        print()
+    if report["not_comparable"]:
+        print("  Not comparable (no reported cost-per-outcome yet):")
+        for nc in report["not_comparable"][:10]:
+            print(f"      {nc['recipient'][:40]:<40} ${nc['amount']:>10,.0f}")
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ein")
+    parser.add_argument("--name")
+    parser.add_argument("--json", help="write full report to this JSON path")
+    args = parser.parse_args()
+    if not args.ein and not args.name:
+        parser.error("pass --ein or --name")
+
+    metrics = load_metrics()
+    by_norm = build_lookup(metrics)
+    benchmarks = build_cause_benchmarks(metrics)
+
+    foundation = find_foundation(ein=args.ein, name=args.name)
+    if not foundation:
+        print("Foundation not found.")
+        return
+
+    report = build_report(foundation, by_norm, benchmarks)
+    print_report(report)
+
+    if args.json:
+        with open(args.json, "w") as f:
+            json.dump(report, f, indent=2)
+        print(f"\n✅ Wrote {args.json}")
+
+if __name__ == "__main__":
+    main()
