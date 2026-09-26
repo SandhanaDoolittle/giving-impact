@@ -7,12 +7,14 @@ fetch('metrics.json')
     const search     = document.getElementById('search');
     const hideBox    = document.getElementById('hide-unavailable');
     const hideEstBox = document.getElementById('hide-estimates');
+    const christianBox = document.getElementById('christian-only');
     const causeGrid  = document.getElementById('cause-grid');
 
     let currentCause    = 'all';
     let currentSearch   = '';
     let hideUnavailable = false;
     let hideEstimates   = false;
+    let christianOnly   = false;
 
     // ── Lookup maps ─────────────────────────────────────
     const tagClass = {
@@ -109,6 +111,7 @@ fetch('metrics.json')
         if (org.pass_through) return false;
         if (hideUnavailable && org.data_available === false) return false;
         if (hideEstimates && org.data_available !== false && org.confidence === 'low') return false;
+        if (christianOnly && !org.is_christian) return false;
         if (currentCause !== 'all' && org.cause !== currentCause) return false;
         if (currentSearch && !org.name.toLowerCase().includes(currentSearch)) return false;
         return true;
@@ -190,6 +193,12 @@ fetch('metrics.json')
     // Hide estimates toggle
     hideEstBox.addEventListener('change', () => {
       hideEstimates = hideEstBox.checked;
+      display(Number(input.value));
+    });
+
+    // Christian orgs only toggle
+    christianBox.addEventListener('change', () => {
+      christianOnly = christianBox.checked;
       display(Number(input.value));
     });
 
