@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""
+tag_christian_orgs.py — Add an is_christian heuristic flag to metrics.json.
+
+Powers the "Hide non-Christian orgs" donor-facing filter. This is a HEURISTIC
+pass, not verified data — every tagged entry gets is_christian_confidence so
+it can be corrected by hand later (same pattern as confidence="auto" on
+impact metrics elsewhere in this file).
+
+Signals used, in order of strength:
+  1. cause == "missions"                     -> high confidence
+  2. name matches an ECFA charter member      -> high confidence
+     (only 76 orgs -- ECFA's full 2,700+ member directory sits behind a
+     dynamic search form that isn't scriptable via plain HTTP requests;
+     revisit with a browser-automation pass to get full ECFA/NCF coverage)
+  3. church_exempt == True                    -> high confidence
+  4. name contains a strong Christian-org keyword -> medium confidence
+     (church, ministries, ministry, gospel, bible, christian, catholic,
+      evangel-, ...)
+
+Anything not matched is left untagged (is_christian absent), NOT set to
+False -- we don't have enough signal to assert a negative for most of the
+4,000+ secular-or-unknown orgs, and asserting False incorrectly is worse
+than leaving it unknown. The UI filter should treat "absent" and "False"
+the same way (don't show under the Christian-only toggle).
+
+Run:
+  python3 tag_christian_orgs.py [--dry-run]
+"""
+
+import json, re, argparse
+
+METRICS_FILE = "metrics.json"
+
+# ECFA Charter Members (static page, 76 orgs still in good standing as of
+# fetch date). Full member directory (2,700+) is not scriptable without
+# browser automation -- see note above.
+ECFA_CHARTER_MEMBERS = {
+    "A3", "African Enterprise", "Asbury Theological Seminary",
+    "Bible League International", "Bible Teaching Resources",
+    "Bibles for the World", "Biblica", "CBMC", "Child Evangelism Fellowship",
+    "Chosen People Ministries", "Christ For The Nations",
+    "Christian Camp and Conference Association", "Christian Leadership Alliance",
+    "Christian Life Missions", "CityTeam", "Coalition for Christian Outreach",
+    "Compassion International", "Converge", "CRISTA Ministries", "Cru",
+    "Dallas Theological Seminary", "Elim Bible College",
+    "Evangelism Explosion International",
+    "Every Home for Christ/World Literature Crusade",
+    "Far East Broadcasting Company", "Food for the Hungry", "Forest Home",
+    "Four Corners Home for Children", "Global Christian Relief",
+    "GO InterNational", "Good News Global", "Gordon-Conwell Theological Seminary",
+    "Gospel Volunteers", "Grace Community Church of the Valley",
+    "Haven Ministries", "Hospitality House Youth Development", "InFaith",
+    "Inner City Impact", "Inspiration Ministries", "Intentional Life Media",
+    "InterVarsity Christian Fellowship/USA", "Jews for Jesus",
+    "John Brown University", "Liebenzell Mission USA", "Ligonier Ministries",
+    "Luis Palau Evangelistic Association", "Lutheran Bible Translators",
+    "MAP International", "Messianic Vision", "Mission Aviation Fellowship",
+    "Mount Hermon Association", "Narramore Christian Foundation",
+    "Oak Hills Fellowship", "OC International",
+    "Officers' Christian Fellowship of the United States of America (OCF)",
+    "One Collective", "One Mission Society USA", "Pacific Island Ministries",
+    "Partners International", "Prison Fellowship Ministries", "Reach Beyond",
+    "Reformed Theological Seminary", "Scripture Union, USA",
+    "Slavic Gospel Association", "Taylor University", "TCM International Institute",
+    "Teen Challenge, Inc.", "The Moody Bible Institute of Chicago",
+    "The Navigators", "The Table Coalition", "Total Living International",
+    "Trinity Anglican Seminary", "Words of Hope", "World Evangelical Alliance",
+    "World Gospel Mission", "World Relief", "World Vision, Inc.",
+    "Wycliffe Bible Translators", "Young Life", "Youth for Christ/USA",
+    "Youth Investment Foundation",
+}
+ECFA_CHARTER_NORM = {n.upper().replace(",", "").replace(".", "").strip() for n in ECFA_CHARTER_MEMBERS}
+
+KEYWORD_PATTERN = re.compile(
+    r"\b("
+    r"CHURCH|MINISTR(Y|IES)|GOSPEL|BIBLE|CHRISTIAN|CATHOLIC|EVANGEL\w*|"
+    r"BAPTIST|METHODIST|LUTHERAN|PRESBYTERIAN|PENTECOSTAL|CATHEDRAL|DIOCESE|"
+    r"PARISH|MISSIONARY|MISSIONS?|CRUSADE|APOSTOLIC|CHRIST\b"
+    r")\b",
+    re.IGNORECASE,
+)
+
+def norm_name(name):
+    return re.sub(r"[^A-Z0-9 ]", "", name.upper()).strip()
+
+def classify(entry):
+    name = entry.get("name", "") or ""
+    if entry.get("cause") == "missions":
+        return True, "high", "cause=missions"
+    if norm_name(name) in ECFA_CHARTER_NORM:
+        return True, "high", "ecfa_charter_member"
+    if entry.get("church_exempt"):
+        return True, "high", "church_exempt"
+    if KEYWORD_PATTERN.search(name):
+        return True, "medium", "name_keyword"
+    return None, None, None
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    with open(METRICS_FILE) as f:
+        data = json.load(f)
+
+    counts = {"high": 0, "medium": 0}
+    examples = {"high": [], "medium": []}
+
+    for entry in data:
+        is_christian, confidence, reason = classify(entry)
+        if is_christian is None:
+            continue
+        counts[confidence] += 1
+        if len(examples[confidence]) < 8:
+            examples[confidence].append(f"{entry['name']} ({reason})")
+        if not args.dry_run:
+            entry["is_christian"] = True
+            entry["is_christian_confidence"] = confidence
+            entry["is_christian_reason"] = reason
+
+    print(f"Tagged high confidence:   {counts['high']}")
+    for e in examples["high"]:
+        print(f"    {e}")
+    print(f"Tagged medium confidence: {counts['medium']}")
+    for e in examples["medium"]:
+        print(f"    {e}")
+    print(f"Untouched (unknown):      {len(data) - counts['high'] - counts['medium']}")
+
+    if args.dry_run:
+        print("\n[dry run -- metrics.json not written]")
+        return
+
+    with open(METRICS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+    print(f"\n✅ Wrote {METRICS_FILE}")
+
+if __name__ == "__main__":
+    main()
