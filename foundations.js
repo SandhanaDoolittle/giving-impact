@@ -234,6 +234,115 @@ function confidenceBadge(conf) {
   return '';
 }
 
+// ── "What this could have funded" comparison ──────────────────────────────────
+// Client-side port of generate_impact_report.py's methodology. See that file
+// for the full writeup of why median-in-cause (not lowest-in-cause) is used:
+// a single hyper-scalable outlier (e.g. free digital content, near-zero
+// marginal cost per person) would otherwise dominate every comparison in its
+// cause, which is a delivery-model mismatch rather than a real efficiency
+// signal. Median represents the typical well-documented org in that cause.
+
+var mData = [], mByNorm = {}, causeBenchmarks = {};
+var DROP_TOKENS = { INC:1, INCORPORATED:1, CORP:1, CORPORATION:1, CO:1, LLC:1, LTD:1, THE:1 };
+
+function normalizeName(name) {
+  if (!name) return '';
+  var n = name.toUpperCase().replace(/&/g, ' AND ').replace(/[^A-Z0-9 ]/g, ' ');
+  return n.split(/\s+/).filter(function(t) { return t && !DROP_TOKENS[t]; }).join(' ');
+}
+
+function median(nums) {
+  var s = nums.slice().sort(function(a, b) { return a - b; });
+  var mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+function buildImpactLookup(metrics) {
+  metrics.forEach(function(e) {
+    var names = e.pp_name ? (Array.isArray(e.pp_name) ? e.pp_name : [e.pp_name]) : [];
+    [e.name].concat(names).forEach(function(n) {
+      if (n) mByNorm[normalizeName(n)] = e;
+    });
+  });
+
+  var byCause = {};
+  metrics.forEach(function(e) {
+    if (e.pass_through) return;
+    if (e.confidence !== 'high' && e.confidence !== 'medium') return;
+    if (!e.cost_per_outcome_usd || !e.cause) return;
+    (byCause[e.cause] = byCause[e.cause] || []).push(e);
+  });
+  Object.keys(byCause).forEach(function(cause) {
+    var entries = byCause[cause];
+    var medCost = median(entries.map(function(e) { return e.cost_per_outcome_usd; }));
+    var closest = entries.reduce(function(best, e) {
+      return Math.abs(e.cost_per_outcome_usd - medCost) < Math.abs(best.cost_per_outcome_usd - medCost) ? e : best;
+    });
+    causeBenchmarks[cause] = {
+      medianCost: medCost,
+      orgName: closest.name,
+      unit: closest.primary_metric_label || closest.primary_metric_unit,
+    };
+  });
+}
+
+function computeImpactComparison(g) {
+  var rows = [], notComparable = [];
+  (g.matched_detail || []).forEach(function(gr) {
+    var entry = mByNorm[normalizeName(gr.recipient)];
+    var cost = entry && entry.cost_per_outcome_usd;
+    var cause = entry && entry.cause;
+    var bench = cause && causeBenchmarks[cause];
+    if (!entry || !cost || !bench) {
+      notComparable.push({ recipient: gr.recipient, amount: gr.amount });
+      return;
+    }
+    var actualUnits = gr.amount / cost;
+    var medianUnits = gr.amount / bench.medianCost;
+    rows.push({
+      recipient: gr.recipient,
+      cause: cause,
+      amount: gr.amount,
+      unit: entry.primary_metric_label || entry.primary_metric_unit,
+      actualUnits: actualUnits,
+      medianOrg: bench.orgName,
+      medianUnits: medianUnits,
+      effPct: medianUnits ? (actualUnits / medianUnits * 100) : null,
+    });
+  });
+  rows.sort(function(a, b) { return b.amount - a.amount; });
+  return { rows: rows, notComparable: notComparable };
+}
+
+function renderImpactPanel(ein) {
+  var g = gData[ein];
+  var cmp = computeImpactComparison(g);
+  if (!cmp.rows.length) {
+    return '<p style="color:var(--ink-muted);font-size:13px;padding:12px 0">Not enough matched grants with cost-per-outcome data to compare yet.</p>';
+  }
+  var html = '<p class="impact-panel-note">Compared only within the same cause (e.g. food security vs. food security), against the MEDIAN reported cost-per-outcome among well-documented organizations in that cause — not the single best, since one hyper-scalable outlier would skew every comparison. This is a narrow cost lens, not a verdict on organizational quality.</p>';
+  cmp.rows.forEach(function(r) {
+    var up = r.effPct != null && r.effPct >= 100;
+    var effTxt = r.effPct != null ? Math.round(r.effPct * 10) / 10 + '%' : '—';
+    html += '<div class="drawer-grant-row">' +
+      '<div class="drawer-grant-left">' +
+        '<div class="drawer-grant-name">' + r.recipient + '</div>' +
+        '<div class="drawer-grant-impact">delivered ~' + Math.round(r.actualUnits).toLocaleString() + ' ' + (r.unit || '') + '</div>' +
+        '<div class="drawer-grant-purpose">median for ' + r.cause.replace('_',' ') + ' (' + r.medianOrg + '): ~' + Math.round(r.medianUnits).toLocaleString() + ' for the same dollars</div>' +
+      '</div>' +
+      '<div class="drawer-grant-right">' +
+        '<div class="drawer-grant-amount">' + fmtA(r.amount) + '</div>' +
+        '<span class="conf-badge ' + (up ? 'conf-high' : 'conf-low') + '">' + (up ? '\u2191 ' : '\u2193 ') + effTxt + '</span>' +
+      '</div>' +
+    '</div>';
+  });
+  if (cmp.notComparable.length) {
+    html += '<div class="drawer-section-title">Not comparable yet (' + cmp.notComparable.length + ')</div>';
+  }
+  return html;
+}
+
+
 var UNRESOLVABLE_LABELS = {
   form_artifact:           { label: 'Form artifact',            title: '990-PF form placeholder — no specific recipient was named in the filing' },
   daf_regrant:             { label: 'DAF / Community Fdn',      title: 'Donor-advised fund or community foundation — the final nonprofit recipient is not disclosed' },
@@ -454,6 +563,10 @@ function openGrantDrawer(ein) {
       '<p style="font-size:13px;color:var(--ink-muted);line-height:1.6;margin:0">' + noDataReason + '</p>' +
     '</div>';
   } else {
+    if (g.matched_detail && g.matched_detail.length > 0) {
+      html += '<button class="filter impact-toggle-btn" id="impact-toggle-btn" data-ein="' + ein + '">📊 See what this could have funded</button>' +
+              '<div id="impact-panel" class="impact-panel" style="display:none"></div>';
+    }
     // Build matched signature set
     var matchedSigs = {};
     (g.matched_detail || []).forEach(function(d) {
@@ -549,6 +662,23 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
 document.addEventListener('click', function(e) {
   var card = e.target.closest('.foundation-card');
   if (card && card.dataset.ein) openGrantDrawer(card.dataset.ein);
+
+  var btn = e.target.closest('#impact-toggle-btn');
+  if (btn) {
+    var panel = document.getElementById('impact-panel');
+    var isOpen = panel.style.display !== 'none';
+    if (isOpen) {
+      panel.style.display = 'none';
+      btn.textContent = '📊 See what this could have funded';
+    } else {
+      if (!panel.dataset.rendered) {
+        panel.innerHTML = renderImpactPanel(btn.dataset.ein);
+        panel.dataset.rendered = '1';
+      }
+      panel.style.display = 'block';
+      btn.textContent = '📊 Hide comparison';
+    }
+  }
 });
 
 document.querySelectorAll('.nav-tab').forEach(function(btn) {
@@ -585,12 +715,19 @@ chunkFetches.push(
     .then(function(r) { return r.json(); })
     .catch(function() { return []; })
 );
+chunkFetches.push(
+  fetch('metrics.json')
+    .then(function(r) { return r.json(); })
+    .catch(function() { return []; })
+);
 Promise.all(chunkFetches).then(function(results) {
   fData = results[0];
   for (var i = 1; i <= 8; i++) {
     results[i].forEach(function(g) { gData[g.ein] = g; });
   }
   results[9].forEach(function(s) { sData[s.ein] = s; });
+  mData = results[10];
+  buildImpactLookup(mData);
   console.log('Loaded', fData.length, 'foundations,', Object.keys(gData).length, 'grant records, and', Object.keys(sData).length, 'priority scores');
   renderRankings();
   renderSummary();
