@@ -723,6 +723,16 @@ body {
 .conf-medium { background: rgba(58,80,104,0.12); color: var(--page-bg); }
 .conf-low    { background: var(--brown-faint); color: var(--brown); }
 
+.impact-toggle-btn {
+  display: block; width: 100%; text-align: left; margin-bottom: 14px;
+  cursor: pointer; font-size: 12.5px; font-weight: 600;
+}
+.impact-panel { margin-bottom: 18px; }
+.impact-panel-note {
+  font-size: 11px; color: var(--ink-ghost); line-height: 1.6;
+  margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--linen-border);
+}
+
 @media (max-width: 760px) {
   .hero-inner { grid-template-columns: 1fr; gap: 36px; }
   .calc-card { border-radius: 14px; }
