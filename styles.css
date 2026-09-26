@@ -497,6 +497,30 @@ body {
 .reliability, .org-revenue, .unavailable-note, .no-data-note {
   font-size: 11px; color: var(--ink-ghost); font-style: italic;
 }
+.source-detail { font-size: 11px; color: var(--ink-ghost); line-height: 1.5; margin-top: 6px; font-style: normal; }
+
+/* ── Flip cards (front summary / back detail) ─────────────────────────────── */
+.flip-card { perspective: 1400px; }
+.flip-card-inner {
+  display: grid;
+  transition: transform 0.5s cubic-bezier(.4,.2,.2,1);
+  transform-style: preserve-3d;
+}
+.flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+.flip-card-front, .flip-card-back {
+  grid-area: 1 / 1;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-card-back { transform: rotateY(180deg); }
+.flip-btn {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  border: 1px solid var(--linen-border); background: #fff; cursor: pointer;
+  font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-muted); transition: background 0.15s; margin-left: auto;
+}
+.flip-btn:hover { background: var(--linen-mid); }
+.card .card-header-row .flip-btn { margin-left: auto; }
 .unavailable-note a { color: var(--page-bg); font-style: normal; }
 
 .tag {
