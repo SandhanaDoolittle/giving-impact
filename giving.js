@@ -149,15 +149,30 @@ fetch('metrics.json')
             <h2>${org.name}</h2>
             ${badge}${contact}${rev}`;
         } else if (org.impact_per_100_usd) {
-          card.className = 'card';
+          card.className = 'card flip-card';
           const reliability = org.reliability || 'Based on published reports — verify before sharing';
+          const extra = org.source_detail || org.extraction_note || '';
           card.innerHTML = `
-            <div class="card-header-row">
-              <span class="tag ${tagClass[org.cause]}">${tagLabel[org.cause]}</span>${confBadge(org)}
-            </div>
-            <h2>${org.name}</h2>
-            <p>Your $${donation} ${impactText(org, donation)}</p>
-            <p class="reliability">${reliability}</p>${rev}`;
+            <div class="flip-card-inner">
+              <div class="flip-card-front">
+                <div class="card-header-row">
+                  <span class="tag ${tagClass[org.cause]}">${tagLabel[org.cause]}</span>
+                  <button class="flip-btn" aria-label="Show details">ⓘ</button>
+                </div>
+                <h2>${org.name}</h2>
+                <p>Your $${donation} ${impactText(org, donation)}</p>
+              </div>
+              <div class="flip-card-back">
+                <div class="card-header-row">
+                  <span class="tag ${tagClass[org.cause]}">${tagLabel[org.cause]}</span>${confBadge(org)}
+                  <button class="flip-btn" aria-label="Back to summary">✕</button>
+                </div>
+                <h2>${org.name}</h2>
+                <p class="reliability">${reliability}</p>
+                ${rev}
+                ${extra ? `<p class="source-detail">${extra}</p>` : ''}
+              </div>
+            </div>`;
         }
 
         if (card.innerHTML) list.appendChild(card);
@@ -167,6 +182,14 @@ fetch('metrics.json')
     // ── Init ─────────────────────────────────────────────
     buildCauseTiles();
     display(100);
+
+    // Flip cards (front summary / back detail)
+    list.addEventListener('click', e => {
+      const btn = e.target.closest('.flip-btn');
+      if (!btn) return;
+      const card = btn.closest('.flip-card');
+      if (card) card.classList.toggle('flipped');
+    });
 
     // Donation
     input.addEventListener('input', () => {
