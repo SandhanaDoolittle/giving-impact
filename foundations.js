@@ -486,40 +486,55 @@ function renderFoundations() {
         grantTag = ' &middot; <span class="year-tag" style="color:#b83c32;border-color:rgba(180,60,50,0.3)" title="This foundation filed electronically but left the grant recipients section of their 990-PF blank. They distributed money but did not publicly disclose who received it.">⚑ Didn\'t disclose recipients</span>';
       }
     }
-    return '<div class="foundation-card ' + (good ? 'compliant' : 'noncompliant') + '" data-ein="' + f.ein + '">' +
-      '<div class="foundation-card-main">' +
-        '<div class="foundation-info">' +
-          '<div class="foundation-name">' + toTitle(f.name) + '</div>' +
-          '<div class="foundation-meta">' + fmtA(f.assets) + ' in assets' +
-          (yr ? ' &middot; <span class="year-tag" title="Most recent IRS tax filing year, averaged over up to 5 years to smooth out one-time spikes.">Filed ' + f.year + '</span>' : '') +
-          (f.operating_foundation ? ' &middot; <span class="year-tag" title="This foundation runs its own charitable programs (like a museum, research institute, or hospital) instead of writing grants to other organizations. It\'s judged by a different IRS standard than the 5% rule.">🏛 Runs its own programs</span>' : '') +
-          (f.flow_through ? (function() {
-            var cp = f.contributions_pct;
-            var isPassThru = cp == null || cp >= 95;
-            return ' &middot; <span class="year-tag" title="' +
-              (isPassThru
-                ? 'This foundation has no real endowment. A parent company or family donates money each year and the foundation passes it directly to grantees — it doesn\'t accumulate or invest its own wealth.'
-                : Math.round(cp) + '% of this foundation\'s giving was funded by donations from a parent company or family, rather than from returns on its own invested endowment.') +
-              '">' + (isPassThru ? '↻ Channels parent donations' : Math.round(cp) + '% funded by parent donations') + '</span>';
-          })() : '') +
-          grantTag +
-          (f.year_gap ? ' &middot; <span class="year-tag" title="We\'re missing data for one or more years in this foundation\'s 5-year window, so the numbers here cover a wider time range than usual.">⚠ Incomplete data window</span>' : '') +
-          (!good ? ' &middot; <strong style="color:#c07840">' + sf + ' below the legal minimum</strong>' : '') +
+    return '<div class="foundation-card flip-card ' + (good ? 'compliant' : 'noncompliant') + '" data-ein="' + f.ein + '">' +
+      '<div class="flip-card-inner">' +
+        '<div class="flip-card-front">' +
+          '<div class="foundation-card-main">' +
+            '<div class="foundation-info">' +
+              '<div class="foundation-name">' + toTitle(f.name) + '</div>' +
+              '<div class="foundation-meta">' + fmtA(f.assets) + ' in assets' + grantTag + '</div>' +
+            '</div>' +
+            '<div class="foundation-stats">' +
+              '<div class="foundation-stat">' +
+                (f.flow_through ? (function() {
+                  var cp = f.contributions_pct;
+                  var isPassThru = cp == null || cp >= 95;
+                  return isPassThru
+                    ? '<div class="payout-rate good">—</div><div class="foundation-stat-label">gives what it receives</div>'
+                    : '<div class="payout-rate good">' + Math.round(cp) + '%</div><div class="foundation-stat-label">funded by parent donations</div>';
+                })()
+                  : '<div class="payout-rate ' + (good ? 'good' : 'bad') + '">' + rate + '%</div><div class="foundation-stat-label">of assets given per year</div>') +
+                '<div class="compliance-badge ' + (good ? 'good' : 'bad') + '">' + (good ? '✓ Meets legal minimum' : '✗ Below legal minimum') + '</div>' +
+              '</div>' +
+              '<button class="flip-btn" aria-label="Show details">ⓘ</button>' +
+            '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="foundation-stats">' +
-          '<div class="foundation-stat"><div class="foundation-stat-value">' + fmtA(f.qualifying) + '</div><div class="foundation-stat-label">given to charity (' + yrs + ' yrs)</div></div>' +
-          '<div class="foundation-stat"><div class="foundation-stat-value">' + fmtA(f.required) + '</div><div class="foundation-stat-label">legal minimum (' + yrs + ' yrs)</div></div>' +
-          '<div class="foundation-stat">' +
-            (f.flow_through ? (function() {
-              var cp = f.contributions_pct;
-              var isPassThru = cp == null || cp >= 95;
-              return isPassThru
-                ? '<div class="payout-rate good">—</div><div class="foundation-stat-label">gives what it receives</div>'
-                : '<div class="payout-rate good">' + Math.round(cp) + '%</div><div class="foundation-stat-label">funded by parent donations</div>';
-            })()
-              : '<div class="payout-rate ' + (good ? 'good' : 'bad') + '">' + rate + '%</div><div class="foundation-stat-label">of assets given per year</div>') +
-            '<div class="compliance-badge ' + (good ? 'good' : 'bad') + '">' + (good ? '✓ Meets legal minimum' : '✗ Below legal minimum') + '</div>' +
+        '<div class="flip-card-back">' +
+          '<div class="foundation-card-main">' +
+            '<div class="foundation-info">' +
+              '<div class="foundation-name">' + toTitle(f.name) + '</div>' +
+              '<div class="foundation-meta">' +
+                (yr ? '<span class="year-tag" title="Most recent IRS tax filing year, averaged over up to 5 years to smooth out one-time spikes.">Filed ' + f.year + '</span>' : '') +
+                (f.operating_foundation ? ' &middot; <span class="year-tag" title="This foundation runs its own charitable programs (like a museum, research institute, or hospital) instead of writing grants to other organizations. It\'s judged by a different IRS standard than the 5% rule.">🏛 Runs its own programs</span>' : '') +
+                (f.flow_through ? (function() {
+                  var cp = f.contributions_pct;
+                  var isPassThru = cp == null || cp >= 95;
+                  return ' &middot; <span class="year-tag" title="' +
+                    (isPassThru
+                      ? 'This foundation has no real endowment. A parent company or family donates money each year and the foundation passes it directly to grantees — it doesn\'t accumulate or invest its own wealth.'
+                      : Math.round(cp) + '% of this foundation\'s giving was funded by donations from a parent company or family, rather than from returns on its own invested endowment.') +
+                    '">' + (isPassThru ? '↻ Channels parent donations' : Math.round(cp) + '% funded by parent donations') + '</span>';
+                })() : '') +
+                (f.year_gap ? ' &middot; <span class="year-tag" title="We\'re missing data for one or more years in this foundation\'s 5-year window, so the numbers here cover a wider time range than usual.">⚠ Incomplete data window</span>' : '') +
+                (!good ? ' &middot; <strong style="color:#c07840">' + sf + ' below the legal minimum</strong>' : '') +
+              '</div>' +
+            '</div>' +
+            '<div class="foundation-stats">' +
+              '<div class="foundation-stat"><div class="foundation-stat-value">' + fmtA(f.qualifying) + '</div><div class="foundation-stat-label">given to charity (' + yrs + ' yrs)</div></div>' +
+              '<div class="foundation-stat"><div class="foundation-stat-value">' + fmtA(f.required) + '</div><div class="foundation-stat-label">legal minimum (' + yrs + ' yrs)</div></div>' +
+              '<button class="flip-btn" aria-label="Back to summary">✕</button>' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -660,6 +675,14 @@ document.getElementById('grant-drawer-overlay').addEventListener('click', closeG
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeGrantDrawer(); });
 
 document.addEventListener('click', function(e) {
+  var flipBtn = e.target.closest('.flip-btn');
+  if (flipBtn) {
+    e.stopPropagation();
+    var flipCard = flipBtn.closest('.flip-card');
+    if (flipCard) flipCard.classList.toggle('flipped');
+    return;
+  }
+
   var card = e.target.closest('.foundation-card');
   if (card && card.dataset.ein) openGrantDrawer(card.dataset.ein);
 
