@@ -166,6 +166,11 @@ Promise.all([
         return `<div class="back-sec"><p class="unavailable-note">Full Form 990 details are not available for this organization yet.</p></div>`;
       }
       let h = '';
+      if (d.xml && d.xml !== 'ok') {
+        h += d.xml.indexOf('no e-filed') === 0
+          ? `<div class="back-sec"><p class="unavailable-note">No Form 990 found in the IRS electronic filing archive. Churches and many religious ministries are not required to file one, so detailed spending figures are not public for this organization.</p></div>`
+          : `<div class="back-sec"><p class="unavailable-note">This organization's latest Form 990 could not be read, so spending details are not shown.</p></div>`;
+      }
       // Efficiency
       if (d.program_ratio != null) {
         const p = d.program_ratio, a = d.admin_ratio || 0, f = d.fundraising_ratio || 0;
