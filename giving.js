@@ -1,6 +1,14 @@
-fetch('metrics.json')
-  .then(r => r.json())
-  .then(orgs => {
+Promise.all([
+  fetch('metrics.json').then(r => r.json()),
+  fetch('ncf_orgs.json').then(r => r.json()).catch(() => [])
+])
+  .then(([baseOrgs, ncfOrgs]) => {
+    let orgs = baseOrgs.concat(ncfOrgs);
+    let showAll = false;          // false = NCF grantees only
+    let otherLoaded = false;
+    let shownCount = 60;          // cards rendered; "Show more" raises it
+    const PAGE = 60;
+    const showAllBox = document.getElementById('show-all-orgs');
 
     const list       = document.getElementById('org-list');
     const input      = document.getElementById('donation');
@@ -76,7 +84,7 @@ fetch('metrics.json')
     // ── Cause tiles ──────────────────────────────────────
     function buildCauseTiles() {
       causeGrid.innerHTML = Object.keys(tagLabel).map(cause => {
-        const n = orgs.filter(o => !o.pass_through && o.cause === cause).length;
+        const n = orgs.filter(o => !o.pass_through && (showAll || o.ncf) && o.cause === cause).length;
         return `
           <button class="cause-tile${cause===currentCause?' active':''}" data-cause="${cause}">
             <span class="tile-circle"><span class="tile-icon">${tileIcon[cause]}</span></span>
@@ -89,6 +97,7 @@ fetch('metrics.json')
         tile.addEventListener('click', () => {
           const next = tile.dataset.cause === currentCause ? 'all' : tile.dataset.cause;
           setActiveCause(next);
+          shownCount = PAGE;
           display(Number(input.value));
           document.getElementById('browse').scrollIntoView({behavior:'smooth', block:'start'});
         });
@@ -109,6 +118,7 @@ fetch('metrics.json')
 
       let filtered = orgs.filter(org => {
         if (org.pass_through) return false;
+        if (!showAll && !org.ncf) return false;
         if (hideUnavailable && org.data_available === false) return false;
         if (hideEstimates && org.data_available !== false && org.confidence === 'low') return false;
         if (christianOnly && !org.is_christian) return false;
@@ -132,7 +142,8 @@ fetch('metrics.json')
         return;
       }
 
-      filtered.forEach(org => {
+      const total = filtered.length;
+      filtered.slice(0, shownCount).forEach(org => {
         const card = document.createElement('div');
         const rev  = org.annual_revenue_usd ? `<p class="org-revenue">Annual revenue: ${fmtRev(org.annual_revenue_usd)}${org.revenue_year ? ' ('+org.revenue_year+')' : ''}</p>` : '';
 
@@ -147,7 +158,7 @@ fetch('metrics.json')
           card.innerHTML = `
             <span class="tag ${tagClass[org.cause]||'tag-community'}">${tagLabel[org.cause]||org.cause}</span>
             <h2>${org.name}</h2>
-            ${badge}${contact}${rev}`;
+            ${badge}${contact}${rev}${ncfLine(org)}`;
         } else if (org.impact_per_100_usd) {
           card.className = 'card flip-card';
           const reliability = org.reliability || 'Based on published reports — verify before sharing';
@@ -171,12 +182,27 @@ fetch('metrics.json')
                 <p class="reliability">${reliability}</p>
                 ${rev}
                 ${extra ? `<p class="source-detail">${extra}</p>` : ''}
+                ${ncfLine(org)}
               </div>
             </div>`;
         }
 
         if (card.innerHTML) list.appendChild(card);
       });
+
+      if (total > shownCount) {
+        const more = document.createElement('button');
+        more.className = 'show-more-btn';
+        more.textContent = `Show more (${(total - shownCount).toLocaleString()} more organizations)`;
+        more.addEventListener('click', () => { shownCount += PAGE; display(Number(input.value)); });
+        list.appendChild(more);
+      }
+    }
+
+    // NCF line shown on the back of a card
+    function ncfLine(org) {
+      if (!org.ncf || !org.ncf_total_granted) return '';
+      return `<p class="source-detail">National Christian Foundation has granted ${fmtRev(org.ncf_total_granted)} to this organization (${org.ncf_years_seen} year${org.ncf_years_seen===1?'':'s'} of grants, latest ${org.ncf_latest_year}).</p>`;
     }
 
     // ── Init ─────────────────────────────────────────────
@@ -204,6 +230,22 @@ fetch('metrics.json')
     // Search
     search.addEventListener('input', () => {
       currentSearch = search.value.toLowerCase().trim();
+      shownCount = PAGE;
+      display(Number(input.value));
+    });
+
+    // Show all organizations (not just NCF grantees). Loads the extra file on first use.
+    showAllBox.addEventListener('change', async () => {
+      showAll = showAllBox.checked;
+      if (showAll && !otherLoaded) {
+        try {
+          const other = await fetch('metrics_other.json').then(r => r.json());
+          orgs = orgs.concat(other);
+          otherLoaded = true;
+        } catch (e) { showAll = false; showAllBox.checked = false; return; }
+      }
+      shownCount = PAGE;
+      buildCauseTiles();
       display(Number(input.value));
     });
 
@@ -230,6 +272,7 @@ fetch('metrics.json')
       btn.addEventListener('click', () => {
         const next = btn.dataset.cause === currentCause ? 'all' : btn.dataset.cause;
         setActiveCause(next);
+        shownCount = PAGE;
         display(Number(input.value));
       });
     });
