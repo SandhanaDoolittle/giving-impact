@@ -50,6 +50,15 @@
             <svg viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <input type="text" id="search" placeholder="Search organizations..." />
           </div>
+          <label class="sort-wrap">
+            <span class="tog-txt">Sort</span>
+            <select id="sort-by">
+              <option value="ncf">NCF rank (most funded)</option>
+              <option value="impact">Impact per dollar</option>
+              <option value="eff">Program spending share</option>
+              <option value="name">Name A to Z</option>
+            </select>
+          </label>
           <label class="tog-wrap">
             <input type="checkbox" id="show-all-orgs" />
             <span class="tog"></span>

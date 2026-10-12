@@ -6,6 +6,7 @@ Promise.all([
     let orgs = baseOrgs.concat(ncfOrgs);
     let showAll = false;          // false = NCF grantees only
     let otherLoaded = false;
+    let sortMode = 'ncf';
     let shownCount = 60;          // cards rendered; "Show more" raises it
     const PAGE = 60;
     const showAllBox = document.getElementById('show-all-orgs');
@@ -112,6 +113,180 @@ Promise.all([
         b.classList.toggle('active', b.dataset.cause === cause));
     }
 
+
+    // ── Card building ────────────────────────────────────
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, c =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    const pct0   = x => (x == null ? 'n/a' : Math.round(x * 100) + '%');
+    const num0   = x => (x == null ? 'n/a' : Number(x).toLocaleString());
+    const money0 = x => (x == null ? 'n/a' : fmtRev(x) || '$0');
+    function safeUrl(u) {
+      if (!u) return null;
+      u = String(u).trim();
+      if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+      try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (e) { return null; }
+    }
+    function tile(label, value, sub) {
+      return `<div class="dt"><div class="dt-val">${value}</div><div class="dt-lab">${label}</div>${sub ? `<div class="dt-sub">${sub}</div>` : ''}</div>`;
+    }
+    function check(label, v) {
+      const cls = v === true ? 'ck-yes' : v === false ? 'ck-no' : 'ck-na';
+      const sym = v === true ? '✓' : v === false ? '✗' : '–';
+      return `<li class="${cls}"><span class="ck-sym">${sym}</span>${label}</li>`;
+    }
+
+    function hasImpact(org) { return org.data_available !== false && !!org.impact_per_100_usd; }
+
+    // Part of the back we can show immediately from the main data file
+    function backBase(org) {
+      let h = '';
+      if (org.ncf) {
+        const rank = org.ncf_rank
+          ? `Ranked <strong>#${org.ncf_rank.toLocaleString()}</strong> of ${org.ncf_rank_of.toLocaleString()} organizations NCF has granted to.` : '';
+        h += `<div class="back-sec"><h3>National Christian Foundation</h3>
+          <p>${rank} NCF has granted <strong>${money0(org.ncf_total_granted)}</strong> in total
+          (${org.ncf_years_seen} year${org.ncf_years_seen === 1 ? '' : 's'} of grants, latest ${org.ncf_latest_year}).
+          ${org.ecfa ? '<span class="badge-ecfa">ECFA member</span>' : ''}</p></div>`;
+      }
+      return h;
+    }
+
+    function impactBack(org) {
+      if (!hasImpact(org)) return '';
+      const rel = org.reliability || '';
+      const extra = org.source_detail || org.extraction_note || '';
+      return `<div class="back-sec"><h3>Impact estimate</h3>
+        ${rel ? `<p>${esc(rel)}</p>` : ''}${extra ? `<p class="source-detail">${esc(extra)}</p>` : ''}</div>`;
+    }
+
+    function detailHtml(d, org) {
+      if (!d) {
+        return `<div class="back-sec"><p class="unavailable-note">Full Form 990 details are not available for this organization yet.</p></div>`;
+      }
+      let h = '';
+      // Efficiency
+      if (d.program_ratio != null) {
+        const p = d.program_ratio, a = d.admin_ratio || 0, f = d.fundraising_ratio || 0;
+        const rest = Math.max(0, 1 - p - a - f);
+        h += `<div class="back-sec"><h3>How it spends money <span class="h3-sub">${d.tax_year ? 'FY' + d.tax_year : ''}</span></h3>
+          <div class="splitbar" title="Program / administration / fundraising">
+            <span class="sb-prog" style="flex:${p}"></span><span class="sb-admin" style="flex:${a}"></span><span class="sb-fund" style="flex:${f}"></span>${rest > 0.005 ? `<span class="sb-rest" style="flex:${rest}"></span>` : ''}
+          </div>
+          <p class="splitkey"><span class="k-prog">Programs ${pct0(p)}</span><span class="k-admin">Administration ${pct0(d.admin_ratio)}</span><span class="k-fund">Fundraising ${pct0(d.fundraising_ratio)}</span></p>
+          <div class="dt-grid">
+            ${d.cost_to_raise != null ? tile('Cost to raise $1', '$' + d.cost_to_raise.toFixed(2)) : ''}
+            ${d.eff_pct != null ? tile('Program spending share', 'Higher than ' + d.eff_pct + '%', 'of listed ' + esc(tagLabel[org.cause] || org.cause) + ' organizations') : ''}
+          </div></div>`;
+      }
+      // Financial health
+      const fin = [];
+      if (d.revenue != null) fin.push(tile('Revenue', money0(d.revenue)));
+      if (d.expenses_total != null) fin.push(tile('Spending', money0(d.expenses_total)));
+      if (d.reserve_months != null) fin.push(tile('Cash and investments', d.reserve_months + ' mo.', 'of spending on hand'));
+      if (d.revenue_change != null) {
+        const c = Math.round(d.revenue_change * 100);
+        fin.push(tile('Revenue change', (c > 0 ? '+' : '') + c + '%', d.revenue_change_years.join(' to ')));
+      }
+      if (d.assets != null) fin.push(tile('Assets', money0(d.assets), d.liabilities != null ? 'liabilities ' + money0(d.liabilities) : ''));
+      if (fin.length) h += `<div class="back-sec"><h3>Financial health</h3><div class="dt-grid">${fin.join('')}</div></div>`;
+      // People and governance
+      const ppl = [];
+      if (d.employees != null) ppl.push(tile('Employees', num0(d.employees)));
+      if (d.volunteers != null) ppl.push(tile('Volunteers', num0(d.volunteers)));
+      if (d.board != null) ppl.push(tile('Board members', num0(d.board), d.board_independent != null ? d.board_independent + ' independent' + (d.independent_pct != null ? ' (' + pct0(d.independent_pct) + ')' : '') : ''));
+      if (d.top_pay != null) ppl.push(tile('Highest officer pay', money0(d.top_pay), esc(d.top_pay_title || '') + (d.top_pay_pct != null ? ' · ' + (d.top_pay_pct * 100).toFixed(1) + '% of spending' : '')));
+      const flags = [];
+      if (d.audited !== undefined) flags.push(check('Audited financial statements', d.audited));
+      if (d.conflict_policy !== undefined) flags.push(check('Conflict-of-interest policy', d.conflict_policy));
+      if (d.whistleblower_policy !== undefined) flags.push(check('Whistleblower policy', d.whistleblower_policy));
+      if (ppl.length || flags.length) {
+        h += `<div class="back-sec"><h3>People and governance</h3>${ppl.length ? `<div class="dt-grid">${ppl.join('')}</div>` : ''}${flags.length ? `<ul class="checks">${flags.join('')}</ul>` : ''}</div>`;
+      }
+      // Programs
+      if (d.programs && d.programs.length) {
+        h += `<div class="back-sec"><h3>Programs, in its own words</h3><ul class="progs">` +
+          d.programs.map(p => `<li>${esc(p.desc)}${p.expense ? ` <span class="prog-cost">(${money0(p.expense)} spent)</span>` : ''}</li>`).join('') +
+          `</ul></div>`;
+      }
+      if (d.mission) h += `<div class="back-sec"><h3>Mission</h3><p>${esc(d.mission)}</p></div>`;
+      return h;
+    }
+
+    function linksHtml(org, d) {
+      const out = [];
+      const site = safeUrl((d && d.website) || org.website);
+      if (site) out.push(`<a href="${esc(site)}" target="_blank" rel="noopener">Website</a>`);
+      const ein = String(org.ein || '').replace(/\D/g, '');
+      if (ein) out.push(`<a href="https://projects.propublica.org/nonprofits/organizations/${ein}" target="_blank" rel="noopener">Full 990 filings (ProPublica)</a>`);
+      return out.length ? `<p class="back-links">${out.join(' · ')}</p>` : '';
+    }
+
+    // Filing details load from small files split by the last digit of the EIN
+    const shardCache = {};
+    function loadShard(ein) {
+      const k = String(ein || '').replace(/\D/g, '').padStart(9, '0').slice(-1);
+      if (!shardCache[k]) shardCache[k] = fetch('details/d' + k + '.json').then(r => (r.ok ? r.json() : {})).catch(() => ({}));
+      return shardCache[k].then(m => m[String(ein).replace(/\D/g, '').padStart(9, '0')]);
+    }
+
+    function fillDetails(card) {
+      if (card.dataset.filled) return;
+      card.dataset.filled = '1';
+      const org = card._org, slot = card.querySelector('.detail-slot');
+      const done = d => { slot.innerHTML = detailHtml(d, org) + impactBack(org) + linksHtml(org, d); };
+      if (!org.ein) { done(null); return; }
+      loadShard(org.ein).then(done);
+    }
+
+    function buildCard(org, donation) {
+      const card = document.createElement('div');
+      const impact = hasImpact(org);
+      card.className = 'card flip-card' + (impact ? '' : ' card-unavailable');
+      card._org = org;
+      const tag = `<span class="tag ${tagClass[org.cause] || 'tag-community'}">${tagLabel[org.cause] || esc(org.cause)}</span>`;
+      const chip = org.ncf_rank
+        ? `<span class="ncf-chip" title="Rank among ${org.ncf_rank_of.toLocaleString()} organizations NCF has granted to, 2013 to 2024">NCF #${org.ncf_rank.toLocaleString()}</span>` : '';
+      let body;
+      if (impact) {
+        body = `<p>Your $${donation} ${impactText(org, donation)}</p>`;
+      } else {
+        let contact = '';
+        if (org.website)    contact = `<p class="unavailable-note">Learn more at <a href="https://${esc(org.website)}" target="_blank" rel="noopener">${esc(org.website)}</a></p>`;
+        else if (org.email) contact = `<p class="unavailable-note">Contact: <a href="mailto:${esc(org.email)}">${esc(org.email)}</a></p>`;
+        const badge = org.church_exempt ? `<span class="badge-church">⛪ No 990 required</span>` : `<p class="unavailable-note">Impact estimate not available.</p>`;
+        body = badge + contact;
+      }
+      card.innerHTML = `
+        <div class="flip-card-inner">
+          <div class="flip-card-front">
+            <div class="card-header-row">${tag}${chip}<button class="flip-btn" aria-label="Show details">ⓘ</button></div>
+            <h2>${org.name}</h2>${body}
+          </div>
+          <div class="flip-card-back">
+            <div class="card-header-row">${tag}${confBadge(org)}<button class="flip-btn" aria-label="Back to summary">✕</button></div>
+            <h2>${org.name}</h2>
+            <div class="back-body">${backBase(org)}<div class="detail-slot"><p class="unavailable-note">Loading filing details…</p></div></div>
+          </div>
+        </div>`;
+      return card;
+    }
+
+    function flipCard(card) {
+      const inner = card.querySelector('.flip-card-inner');
+      const swap = () => {
+        card.classList.toggle('flipped');
+        if (card.classList.contains('flipped')) fillDetails(card);
+      };
+      if (!inner.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { swap(); return; }
+      inner.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(90deg)' }], { duration: 170, easing: 'ease-in' })
+        .onfinish = () => {
+          swap();
+          inner.animate([{ transform: 'rotateY(-90deg)' }, { transform: 'rotateY(0deg)' }], { duration: 170, easing: 'ease-out' });
+        };
+    }
+
     // ── Display ──────────────────────────────────────────
     function display(donation) {
       list.innerHTML = '';
@@ -127,14 +302,26 @@ Promise.all([
         return true;
       });
 
+      const nm = (a, b) => (a.name || '').localeCompare(b.name || '');
+      const hi = o => hasImpact(o);
       filtered.sort((a, b) => {
-        const aD = a.data_available !== false && a.impact_per_100_usd;
-        const bD = b.data_available !== false && b.impact_per_100_usd;
-        if (aD && !bD) return -1;
-        if (!aD && bD) return 1;
-        if (!aD && !bD) return (a.name||'').localeCompare(b.name||'');
-        if (currentCause === 'all') return (a.name||'').localeCompare(b.name||'');
-        return (b.impact_per_100_usd||0) - (a.impact_per_100_usd||0);
+        if (sortMode === 'name') return nm(a, b);
+        if (sortMode === 'ncf') {
+          const ra = a.ncf_rank || 1e9, rb = b.ncf_rank || 1e9;
+          return ra - rb || nm(a, b);
+        }
+        if (sortMode === 'eff') {
+          const pa = a.program_ratio, pb = b.program_ratio;
+          if (pa == null && pb == null) return nm(a, b);
+          if (pa == null) return 1;
+          if (pb == null) return -1;
+          return pb - pa || nm(a, b);
+        }
+        // impact per dollar
+        if (hi(a) && !hi(b)) return -1;
+        if (!hi(a) && hi(b)) return 1;
+        if (!hi(a) && !hi(b)) return nm(a, b);
+        return (b.impact_per_100_usd || 0) - (a.impact_per_100_usd || 0);
       });
 
       if (filtered.length === 0) {
@@ -143,52 +330,7 @@ Promise.all([
       }
 
       const total = filtered.length;
-      filtered.slice(0, shownCount).forEach(org => {
-        const card = document.createElement('div');
-        const rev  = org.annual_revenue_usd ? `<p class="org-revenue">Annual revenue: ${fmtRev(org.annual_revenue_usd)}${org.revenue_year ? ' ('+org.revenue_year+')' : ''}</p>` : '';
-
-        if (org.data_available === false) {
-          card.className = 'card card-unavailable';
-          let contact = '';
-          if (org.website)     contact = `<p class="unavailable-note">Learn more at <a href="https://${org.website}" target="_blank">${org.website}</a></p>`;
-          else if (org.email)  contact = `<p class="unavailable-note">Contact: <a href="mailto:${org.email}">${org.email}</a></p>`;
-          const badge = org.church_exempt
-            ? `<span class="badge-church">⛪ No 990 required</span>`
-            : `<p class="unavailable-note">Impact data not yet available.</p>`;
-          card.innerHTML = `
-            <span class="tag ${tagClass[org.cause]||'tag-community'}">${tagLabel[org.cause]||org.cause}</span>
-            <h2>${org.name}</h2>
-            ${badge}${contact}${rev}${ncfLine(org)}`;
-        } else if (org.impact_per_100_usd) {
-          card.className = 'card flip-card';
-          const reliability = org.reliability || 'Based on published reports — verify before sharing';
-          const extra = org.source_detail || org.extraction_note || '';
-          card.innerHTML = `
-            <div class="flip-card-inner">
-              <div class="flip-card-front">
-                <div class="card-header-row">
-                  <span class="tag ${tagClass[org.cause]}">${tagLabel[org.cause]}</span>
-                  <button class="flip-btn" aria-label="Show details">ⓘ</button>
-                </div>
-                <h2>${org.name}</h2>
-                <p>Your $${donation} ${impactText(org, donation)}</p>
-              </div>
-              <div class="flip-card-back">
-                <div class="card-header-row">
-                  <span class="tag ${tagClass[org.cause]}">${tagLabel[org.cause]}</span>${confBadge(org)}
-                  <button class="flip-btn" aria-label="Back to summary">✕</button>
-                </div>
-                <h2>${org.name}</h2>
-                <p class="reliability">${reliability}</p>
-                ${rev}
-                ${extra ? `<p class="source-detail">${extra}</p>` : ''}
-                ${ncfLine(org)}
-              </div>
-            </div>`;
-        }
-
-        if (card.innerHTML) list.appendChild(card);
-      });
+      filtered.slice(0, shownCount).forEach(org => list.appendChild(buildCard(org, donation)));
 
       if (total > shownCount) {
         const more = document.createElement('button');
@@ -197,12 +339,6 @@ Promise.all([
         more.addEventListener('click', () => { shownCount += PAGE; display(Number(input.value)); });
         list.appendChild(more);
       }
-    }
-
-    // NCF line shown on the back of a card
-    function ncfLine(org) {
-      if (!org.ncf || !org.ncf_total_granted) return '';
-      return `<p class="source-detail">National Christian Foundation has granted ${fmtRev(org.ncf_total_granted)} to this organization (${org.ncf_years_seen} year${org.ncf_years_seen===1?'':'s'} of grants, latest ${org.ncf_latest_year}).</p>`;
     }
 
     // ── Init ─────────────────────────────────────────────
@@ -214,7 +350,7 @@ Promise.all([
       const btn = e.target.closest('.flip-btn');
       if (!btn) return;
       const card = btn.closest('.flip-card');
-      if (card) card.classList.toggle('flipped');
+      if (card) flipCard(card);
     });
 
     // Donation
@@ -246,6 +382,13 @@ Promise.all([
       }
       shownCount = PAGE;
       buildCauseTiles();
+      display(Number(input.value));
+    });
+
+    // Sort
+    document.getElementById('sort-by').addEventListener('change', e => {
+      sortMode = e.target.value;
+      shownCount = PAGE;
       display(Number(input.value));
     });
 
