@@ -189,10 +189,10 @@ Promise.all([
       const fin = [];
       if (d.revenue != null) fin.push(tile('Revenue', money0(d.revenue)));
       if (d.expenses_total != null) fin.push(tile('Spending', money0(d.expenses_total)));
-      if (d.reserve_months != null) fin.push(tile('Cash and investments', d.reserve_months + ' mo.', 'of spending on hand'));
+      if (d.reserve_months != null) fin.push(tile('Cash and investments', d.reserve_months >= 36 ? Math.round(d.reserve_months / 12) + ' yrs' : d.reserve_months + ' mo.', 'of spending on hand'));
       if (d.revenue_change != null) {
         const c = Math.round(d.revenue_change * 100);
-        fin.push(tile('Revenue change', (c > 0 ? '+' : '') + c + '%', d.revenue_change_years.join(' to ')));
+        fin.push(tile('Revenue change', c > 500 ? 'Over +500%' : (c > 0 ? '+' : '') + c + '%', d.revenue_change_years.join(' to ')));
       }
       if (d.assets != null) fin.push(tile('Assets', money0(d.assets), d.liabilities != null ? 'liabilities ' + money0(d.liabilities) : ''));
       if (fin.length) h += `<div class="back-sec"><h3>Financial health</h3><div class="dt-grid">${fin.join('')}</div></div>`;
