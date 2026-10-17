@@ -137,6 +137,22 @@ Promise.all([
       return `<li class="${cls}"><span class="ck-sym">${sym}</span>${label}</li>`;
     }
 
+    // Many filings are typed in ALL CAPS. Show those in sentence case; trim long text.
+    function tidy(s, max) {
+      s = String(s || '').trim();
+      if (s && s === s.toUpperCase()) {
+        s = s.toLowerCase().replace(/(^|[.!?:]\s+)([a-z])/g, (m, a, b) => a + b.toUpperCase());
+        // restore common proper nouns that lowercasing flattened
+        s = s.replace(/\b(god|jesus|christ|christian|christians|christmas|lord|savior|bible|gospel|holy spirit|american|america|africa|african|asia|asian|india|haiti|china|israel|ukraine|sudan|mexico|latin america|u\.s\.|usa|ncf|ecfa)\b/g,
+          w => w.replace(/(^|\s)([a-z])/g, (m, sp, c) => sp + c.toUpperCase()).replace('U.s.', 'U.S.').replace('Usa', 'USA').replace('Ncf', 'NCF').replace('Ecfa', 'ECFA'));
+      }
+      if (max && s.length > max) {
+        s = s.slice(0, max);
+        s = s.replace(/\s+\S*$/, '') + '…';
+      }
+      return s;
+    }
+
     function hasImpact(org) { return org.data_available !== false && !!org.impact_per_100_usd; }
 
     // Part of the back we can show immediately from the main data file
@@ -194,28 +210,39 @@ Promise.all([
         const c = Math.round(d.revenue_change * 100);
         fin.push(tile('Revenue change', c > 500 ? 'Over +500%' : (c > 0 ? '+' : '') + c + '%', d.revenue_change_years.join(' to ')));
       }
+      if (d.contrib_pct != null) fin.push(tile('From gifts and grants', pct0(d.contrib_pct), 'of revenue'));
+      if (d.govt_pct != null && d.govt_pct > 0.005) fin.push(tile('Government funding', pct0(d.govt_pct), 'of revenue'));
+      if (d.earned_pct != null && d.earned_pct > 0.005) fin.push(tile('Fees for services', pct0(d.earned_pct), 'of revenue'));
       if (d.assets != null) fin.push(tile('Assets', money0(d.assets), d.liabilities != null ? 'liabilities ' + money0(d.liabilities) : ''));
       if (fin.length) h += `<div class="back-sec"><h3>Financial health</h3><div class="dt-grid">${fin.join('')}</div></div>`;
       // People and governance
       const ppl = [];
+      if (d.founded) ppl.push(tile('Founded', esc(d.founded)));
       if (d.employees != null) ppl.push(tile('Employees', num0(d.employees)));
       if (d.volunteers != null) ppl.push(tile('Volunteers', num0(d.volunteers)));
       if (d.board != null) ppl.push(tile('Board members', num0(d.board), d.board_independent != null ? d.board_independent + ' independent' + (d.independent_pct != null ? ' (' + pct0(d.independent_pct) + ')' : '') : ''));
+      if (d.salaries_pct != null) ppl.push(tile('Staff pay and benefits', pct0(d.salaries_pct), 'of spending'));
+      if (d.grants_paid && d.grants_pct != null && d.grants_pct > 0.005) {
+        const fg = d.grants_foreign ? ', ' + money0(d.grants_foreign) + ' abroad' : '';
+        ppl.push(tile('Grants to other organizations', money0(d.grants_paid), pct0(d.grants_pct) + ' of spending' + fg));
+      }
+      if (d.high_paid_staff) ppl.push(tile('Staff paid over $100K', num0(d.high_paid_staff)));
       if (d.top_pay != null) ppl.push(tile('Highest officer pay', money0(d.top_pay), esc(d.top_pay_title || '') + (d.top_pay_pct != null ? ' · ' + (d.top_pay_pct * 100).toFixed(1) + '% of spending' : '')));
       const flags = [];
       if (d.audited !== undefined) flags.push(check('Audited financial statements', d.audited));
       if (d.conflict_policy !== undefined) flags.push(check('Conflict-of-interest policy', d.conflict_policy));
       if (d.whistleblower_policy !== undefined) flags.push(check('Whistleblower policy', d.whistleblower_policy));
+      if (d.audit_committee !== undefined) flags.push(check('Audit committee', d.audit_committee));
       if (ppl.length || flags.length) {
         h += `<div class="back-sec"><h3>People and governance</h3>${ppl.length ? `<div class="dt-grid">${ppl.join('')}</div>` : ''}${flags.length ? `<ul class="checks">${flags.join('')}</ul>` : ''}</div>`;
       }
       // Programs
       if (d.programs && d.programs.length) {
         h += `<div class="back-sec"><h3>Programs, in its own words</h3><ul class="progs">` +
-          d.programs.map(p => `<li>${esc(p.desc)}${p.expense ? ` <span class="prog-cost">(${money0(p.expense)} spent)</span>` : ''}</li>`).join('') +
+          d.programs.slice(0, 3).map(p => `<li>${esc(tidy(p.desc, 330))}${p.expense ? ` <span class="prog-cost">(${money0(p.expense)} spent${d.expenses_program ? ', ' + pct0(p.expense / d.expenses_program) + ' of program spending' : ''})</span>` : ''}</li>`).join('') +
           `</ul></div>`;
       }
-      if (d.mission) h += `<div class="back-sec"><h3>Mission</h3><p>${esc(d.mission)}</p></div>`;
+      if (d.mission) h += `<div class="back-sec"><h3>Mission</h3><p>${esc(tidy(d.mission, 420))}</p></div>`;
       return h;
     }
 
